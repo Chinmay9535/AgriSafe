@@ -1,0 +1,174 @@
+// 🔗 BLOCKCHAIN EXTENSION FOR GRAINTRUST SCHEMA
+// Add these models to your existing schema.prisma file
+
+// Batch model with blockchain integration
+model Batch {
+  id                    String    @id @default(uuid())
+  batchCode             String    @unique
+  name                  String
+  cropType              String
+  quantity              Float
+  farmerId              String
+  farmerName            String
+  location              String
+  harvestDate           DateTime
+  status                BatchStatus @default(PENDING)
+  
+  // Blockchain fields
+  blockchainHash        String?   @unique // Hash of batch data on blockchain
+  blockchainTxHash      String?   // Transaction hash
+  blockchainSyncedAt    DateTime? // When synced to blockchain
+  blockchainStatus      BlockchainStatus @default(NOT_SYNCED)
+  blockchainNetwork     String?   // e.g., "ethereum-sepolia", "polygon-mumbai"
+  blockchainVerified    Boolean   @default(false)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  stages                Stage[]
+  blockchainRecords     BlockchainRecord[]
+
+  @@map("batches")
+}
+
+// Blockchain transaction records
+model BlockchainRecord {
+  id                    String    @id @default(uuid())
+  batchId               String
+  batch                 Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  
+  // Transaction details
+  transactionHash       String    @unique
+  blockNumber           Int?
+  blockchainNetwork     String    // e.g., "ethereum-sepolia"
+  contractAddress       String?   // Smart contract address if used
+  
+  // Data hash and verification
+  dataHash              String    // SHA-256 hash of batch data
+  previousHash          String?   // Link to previous record (blockchain chain)
+  merkleRoot            String?   // Merkle root of all stage data
+  
+  // Metadata
+  recordType            RecordType @default(BATCH_CREATED)
+  gasUsed               String?
+  gasPrice              String?
+  status                TransactionStatus @default(PENDING)
+  
+  // Verification data
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  verificationProof     String?   @db.Text // JSON proof data
+  
+  // Timestamps
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  syncedAt              DateTime  @default(now())
+
+  @@index([batchId])
+  @@index([transactionHash])
+  @@map("blockchain_records")
+}
+
+// Stage model with blockchain support
+model Stage {
+  id                    String    @id @default(uuid())
+  batchId               String
+  batch                 Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  
+  name                  String
+  description           String?
+  order                 Int
+  completedAt           DateTime?
+  status                StageStatus @default(PENDING)
+  
+  // Image tracking
+  imageUrls             String[]  // Array of image URLs
+  imageHashes           String[]  // Blockchain hashes of images
+  
+  // Verification
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([batchId])
+  @@map("stages")
+}
+
+// Blockchain verification log
+model BlockchainVerificationLog {
+  id                    String    @id @default(uuid())
+  batchId               String
+  transactionHash       String
+  
+  verifierAddress       String    // Blockchain address of verifier
+  verifierRole          String    // ADMIN, CERTIFIER, etc.
+  verificationType      VerificationType
+  
+  result                VerificationResult
+  details               String?   @db.Text // JSON details
+  
+  createdAt             DateTime  @default(now())
+
+  @@index([batchId])
+  @@index([transactionHash])
+  @@map("blockchain_verification_logs")
+}
+
+// Enums
+enum BatchStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  BLOCKCHAIN_SYNCED
+  REJECTED
+}
+
+enum BlockchainStatus {
+  NOT_SYNCED
+  PENDING_SYNC
+  SYNCING
+  SYNCED
+  SYNC_FAILED
+  VERIFIED
+}
+
+enum StageStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+}
+
+enum RecordType {
+  BATCH_CREATED
+  BATCH_UPDATED
+  STAGE_COMPLETED
+  VERIFICATION_ADDED
+  TRANSFER_INITIATED
+  TRANSFER_COMPLETED
+  CERTIFICATE_ISSUED
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REVERTED
+}
+
+enum VerificationType {
+  IMAGE_VERIFICATION
+  QUALITY_CHECK
+  QUANTITY_VERIFICATION
+  AUTHENTICITY_CHECK
+  FINAL_CERTIFICATION
+}
+
+enum VerificationResult {
+  PASSED
+  FAILED
+  PENDING_REVIEW
+}
